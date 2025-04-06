@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UK Tax Planning Calculator</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .loading {
+            display: none;
+        }
+        .loading.active {
+            display: block;
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <div class="container mx-auto px-4 py-8">
+        <h1 class="text-3xl font-bold text-center mb-8 text-blue-600">UK Tax Planning Calculator</h1>
+        
+        <!-- Input Form -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+            <form id="taxForm" class="space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Annual Income (£)</label>
+                        <input type="number" name="annual_income" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Spouse's Income (£)</label>
+                        <input type="number" name="spouse_income" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Postcode</label>
+                        <input type="text" name="postcode" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Pension Contribution (%)</label>
+                        <input type="number" name="pension_contribution" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Number of Children</label>
+                        <input type="number" name="num_children" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Has Children?</label>
+                            <input type="checkbox" name="has_children" class="mt-1 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Has Student Loan?</label>
+                            <input type="checkbox" name="has_student_loan" class="mt-1 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                        </div>
+                    </div>
+                </div>
+                <div class="flex justify-center">
+                    <button type="submit" class="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+                        Calculate
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Loading Spinner -->
+        <div class="loading text-center mb-8">
+            <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-blue-600 border-t-transparent"></div>
+            <p class="mt-2 text-gray-600">Calculating...</p>
+        </div>
+
+        <!-- Results -->
+        <div id="results" class="space-y-8">
+            <!-- Tax Calculation -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h2 class="text-xl font-semibold mb-4 text-blue-600">Tax Calculation Breakdown</h2>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Item</th>
+                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Amount (£)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="calculationTable" class="bg-white divide-y divide-gray-200">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Tax Optimizations -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h2 class="text-xl font-semibold mb-4 text-blue-600">Tax Optimization Suggestions</h2>
+                <div id="optimizations" class="space-y-4">
+                </div>
+            </div>
+
+            <!-- Benefits Eligibility -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h2 class="text-xl font-semibold mb-4 text-blue-600">Benefits Eligibility</h2>
+                <div id="benefits" class="space-y-4">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('taxForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            // Show loading spinner
+            document.querySelector('.loading').classList.add('active');
+            document.getElementById('results').style.display = 'none';
+            
+            // Get form data
+            const formData = new FormData(e.target);
+            const data = {
+                annual_income: formData.get('annual_income'),
+                spouse_income: formData.get('spouse_income'),
+                has_children: formData.get('has_children') ? 'true' : 'false',
+                num_children: formData.get('num_children'),
+                postcode: formData.get('postcode'),
+                has_student_loan: formData.get('has_student_loan') ? 'true' : 'false',
+                pension_contribution: formData.get('pension_contribution')
+            };
+            
+            try {
+                const response = await fetch('/calculate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(data)
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    // Update calculation table
+                    const calculationTable = document.getElementById('calculationTable');
+                    calculationTable.innerHTML = '';
+                    
+                    for (const [key, value] of Object.entries(result.calculation)) {
+                        if (typeof value === 'number') {
+                            const row = document.createElement('tr');
+                            row.innerHTML = `
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${key.replace(/_/g, ' ').toUpperCase()}</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">£${value.toLocaleString('en-GB', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                            `;
+                            calculationTable.appendChild(row);
+                        }
+                    }
+                    
+                    // Update optimizations
+                    const optimizationsDiv = document.getElementById('optimizations');
+                    optimizationsDiv.innerHTML = '';
+                    
+                    result.optimizations.forEach(opt => {
+                        const div = document.createElement('div');
+                        div.className = 'border rounded-lg p-4';
+                        div.innerHTML = `
+                            <h3 class="font-semibold text-lg mb-2">${opt.strategy}</h3>
+                            <p class="text-gray-600 mb-1">Current: ${opt.current_value}</p>
+                            <p class="text-gray-600 mb-1">Suggested: ${opt.suggested_value}</p>
+                            <p class="text-green-600 font-semibold mb-1">Potential Tax Saving: ${opt.tax_saving}</p>
+                            <p class="text-gray-600 mb-1">Net Cost: ${opt.net_cost}</p>
+                            <p class="text-gray-600">${opt.explanation}</p>
+                        `;
+                        optimizationsDiv.appendChild(div);
+                    });
+                    
+                    // Update benefits
+                    const benefitsDiv = document.getElementById('benefits');
+                    benefitsDiv.innerHTML = '';
+                    
+                    result.benefits.forEach(benefit => {
+                        const div = document.createElement('div');
+                        div.className = 'border rounded-lg p-4';
+                        div.innerHTML = `
+                            <h3 class="font-semibold text-lg mb-2">${benefit.benefit}</h3>
+                            <p class="text-gray-600 mb-1">Status: <span class="${benefit.eligible ? 'text-green-600' : 'text-red-600'}">${benefit.eligible ? 'Eligible' : 'Not Eligible'}</span></p>
+                            <p class="text-gray-600 mb-1">Amount: ${benefit.amount}</p>
+                            <p class="text-gray-600">${benefit.explanation}</p>
+                        `;
+                        benefitsDiv.appendChild(div);
+                    });
+                    
+                    // Show results
+                    document.getElementById('results').style.display = 'block';
+                } else {
+                    alert('Error: ' + result.error);
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            } finally {
+                // Hide loading spinner
+                document.querySelector('.loading').classList.remove('active');
+            }
+        });
+    </script>
+</body>
+</html> 
