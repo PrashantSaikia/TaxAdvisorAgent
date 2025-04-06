@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request, jsonify, send_from_directory
-from tax_agent import TaxCalculator, UserDetails
+from .tax_agent import TaxCalculator, UserDetails
 from dotenv import load_dotenv
 import os
 
