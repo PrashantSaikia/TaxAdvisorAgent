@@ -516,7 +516,7 @@ class TaxCalculator:
 
 def get_user_input() -> UserDetails:
     """Collect user details through console input"""
-    console.print(Panel.fit("UK Tax Planning Calculator", style="bold blue"))
+    console.print(Panel.fit("UK Tax and Benefits Calculator", style="bold blue"))
     
     try:
         annual_income = float(console.input("[bold]Enter your annual income (£): [/bold]"))

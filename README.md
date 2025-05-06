@@ -1,4 +1,4 @@
-# UK Tax Planning Calculator
+# UK Tax and Benefits Calculator
 
 A comprehensive web application for calculating UK tax liabilities and providing personalized optimization strategies. The application helps users understand their tax obligations, identifies potential savings opportunities, and checks eligibility for various benefits.
 
