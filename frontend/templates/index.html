@@ -87,6 +87,12 @@
 
         <!-- Results -->
         <div id="results" class="space-y-8 hidden">
+            <!-- Download Chat Button -->
+            <div class="flex justify-end mb-4">
+                <button id="downloadChatBtn" class="bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2">
+                    <i class="fa fa-download mr-2"></i>Download Chat
+                </button>
+            </div>
             <!-- Pension Contribution Box -->
             <div class="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-4">
                 <h2 class="text-lg font-semibold text-blue-700 mb-2">Pension Contribution</h2>
@@ -471,6 +477,170 @@
         });
         // Trigger change on page load to set correct fields
         document.getElementById('employment-type-select').dispatchEvent(new Event('change'));
+
+        // Download Chat as PDF functionality
+        document.getElementById('downloadChatBtn').addEventListener('click', function() {
+            if (typeof jsPDF === 'undefined') {
+                alert('PDF generation is still loading. Please try again in a moment.');
+                return;
+            }
+            const doc = new jsPDF();
+            let yPos = 20;
+            // Title
+            doc.setFontSize(20);
+            doc.setTextColor(44, 62, 80);
+            doc.setFont(undefined, 'bold');
+            doc.text('UK Tax and Benefits Calculator - Chat History', 20, yPos);
+            yPos += 12;
+            // Date
+            doc.setFontSize(10);
+            doc.setTextColor(100);
+            doc.setFont(undefined, 'normal');
+            doc.text(`Generated on: ${new Date().toLocaleDateString('en-GB')}`, 20, yPos);
+            yPos += 10;
+            // User Inputs
+            doc.setFontSize(14);
+            doc.setTextColor(44, 62, 80);
+            doc.setFont(undefined, 'bold');
+            doc.text('User Inputs', 20, yPos);
+            yPos += 8;
+            doc.setFontSize(11);
+            doc.setTextColor(0);
+            doc.setFont(undefined, 'normal');
+            const form = document.getElementById('taxForm');
+            const elements = form.elements;
+            for (let i = 0; i < elements.length; i++) {
+                const el = elements[i];
+                if (el.name && el.value) {
+                    const label = el.previousElementSibling ? el.previousElementSibling.textContent : el.name;
+                    doc.text(`${label}:`, 20, yPos);
+                    doc.text(`${el.value}`, 80, yPos);
+                    yPos += 7;
+                }
+            }
+            yPos += 5;
+            // Pension Contribution
+            const pensionBox = document.getElementById('pensionContributionBox');
+            if (pensionBox && pensionBox.textContent) {
+                doc.setFontSize(13);
+                doc.setTextColor(41, 128, 185); // blue
+                doc.setFont(undefined, 'bold');
+                doc.text('Pension Contribution', 20, yPos);
+                yPos += 7;
+                doc.setFontSize(11);
+                doc.setTextColor(0);
+                doc.setFont(undefined, 'normal');
+                doc.text(pensionBox.textContent, 25, yPos);
+                yPos += 10;
+            }
+            // Tax Breakdown
+            const taxBreakdownBox = document.getElementById('taxBreakdownBox');
+            if (taxBreakdownBox && taxBreakdownBox.children.length > 0) {
+                doc.setFontSize(13);
+                doc.setTextColor(243, 156, 18); // orange
+                doc.setFont(undefined, 'bold');
+                doc.text('Tax Breakdown', 20, yPos);
+                yPos += 7;
+                doc.setFontSize(11);
+                doc.setTextColor(0);
+                doc.setFont(undefined, 'normal');
+                for (let i = 0; i < taxBreakdownBox.children.length; i++) {
+                    const row = taxBreakdownBox.children[i];
+                    const [label, value] = row.textContent.split(/£/);
+                    if (label && value) {
+                        doc.text(label.trim() + ':', 25, yPos);
+                        doc.text('£' + value.trim(), 120, yPos, { align: 'right', maxWidth: 60 });
+                    } else {
+                        doc.text(row.textContent.trim(), 25, yPos);
+                    }
+                    yPos += 7;
+                }
+                yPos += 5;
+            }
+            // Net Income
+            const netIncomeBox = document.getElementById('netIncomeBox');
+            if (netIncomeBox && netIncomeBox.textContent) {
+                doc.setFontSize(13);
+                doc.setTextColor(39, 174, 96); // green
+                doc.setFont(undefined, 'bold');
+                doc.text('Net Income', 20, yPos);
+                doc.setFontSize(12);
+                doc.setTextColor(0);
+                doc.setFont(undefined, 'normal');
+                doc.text(netIncomeBox.textContent, 120, yPos, { align: 'right', maxWidth: 60 });
+                yPos += 12;
+            }
+            // Tax Optimization Suggestions
+            const optimizationsDiv = document.getElementById('optimizations');
+            if (optimizationsDiv && optimizationsDiv.children.length > 0) {
+                doc.setFontSize(13);
+                doc.setTextColor(41, 128, 185); // blue
+                doc.setFont(undefined, 'bold');
+                doc.text('Tax Optimization Suggestions', 20, yPos);
+                yPos += 7;
+                doc.setFontSize(11);
+                doc.setTextColor(0);
+                doc.setFont(undefined, 'normal');
+                for (let i = 0; i < optimizationsDiv.children.length; i++) {
+                    const opt = optimizationsDiv.children[i];
+                    const title = opt.querySelector('h3') ? opt.querySelector('h3').textContent : '';
+                    doc.setFont(undefined, 'bold');
+                    doc.text(`• ${title}`, 25, yPos);
+                    yPos += 6;
+                    doc.setFont(undefined, 'normal');
+                    const ps = opt.querySelectorAll('p');
+                    for (let j = 0; j < ps.length; j++) {
+                        const lines = doc.splitTextToSize(ps[j].textContent, 160);
+                        for (let k = 0; k < lines.length; k++) {
+                            if (yPos > 270) { doc.addPage(); yPos = 20; }
+                            doc.text(lines[k], 30, yPos);
+                            yPos += 6;
+                        }
+                    }
+                    yPos += 4;
+                }
+            }
+            // Benefits Eligibility
+            const benefitsDiv = document.getElementById('benefits');
+            if (benefitsDiv && benefitsDiv.children.length > 0) {
+                doc.setFontSize(13);
+                doc.setTextColor(41, 128, 185); // blue
+                doc.setFont(undefined, 'bold');
+                doc.text('Benefits Eligibility', 20, yPos);
+                yPos += 7;
+                doc.setFontSize(11);
+                doc.setTextColor(0);
+                doc.setFont(undefined, 'normal');
+                for (let i = 0; i < benefitsDiv.children.length; i++) {
+                    const ben = benefitsDiv.children[i];
+                    const title = ben.querySelector('h3') ? ben.querySelector('h3').textContent : '';
+                    doc.setFont(undefined, 'bold');
+                    doc.text(`• ${title}`, 25, yPos);
+                    yPos += 6;
+                    doc.setFont(undefined, 'normal');
+                    const ps = ben.querySelectorAll('p');
+                    for (let j = 0; j < ps.length; j++) {
+                        const lines = doc.splitTextToSize(ps[j].textContent, 160);
+                        for (let k = 0; k < lines.length; k++) {
+                            if (yPos > 270) { doc.addPage(); yPos = 20; }
+                            doc.text(lines[k], 30, yPos);
+                            yPos += 6;
+                        }
+                    }
+                    yPos += 4;
+                }
+            }
+            // Footer
+            const pageCount = doc.internal.getNumberOfPages();
+            for (let i = 1; i <= pageCount; i++) {
+                doc.setPage(i);
+                doc.setFontSize(8);
+                doc.setTextColor(100);
+                doc.text(`Page ${i} of ${pageCount}`, 20, 285);
+                doc.text('This chat history is for informational purposes only.', 20, 290);
+            }
+            doc.save('tax-chat-history.pdf');
+        });
     </script>
 </body>
 </html> 
