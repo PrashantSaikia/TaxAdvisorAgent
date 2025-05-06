@@ -25,6 +25,8 @@ class UserDetails(BaseModel):
     has_student_loan: bool = Field(False, description="Whether the user has a student loan")
     student_loan_plan: Optional[str] = Field(None, description="Student loan plan type")
     pension_contribution: float = Field(0.0, description="Current pension contribution percentage")
+    employment_type: str = Field("employed", description="Employment type: employed, self_employed, ltd_director")
+    salary_taken: Optional[float] = Field(None, description="Salary taken by Ltd Company Director")
     
     @validator('annual_income', 'spouse_income', 'pension_contribution')
     def validate_positive_numbers(cls, v):
@@ -73,36 +75,134 @@ class TaxCalculator:
         """Calculate tax liability based on user details and thresholds"""
         # Determine if user is in Scotland
         is_scotland = self._is_scottish_postcode(user.postcode)
-        
+
         # Calculate taxable income after pension contributions
         pension_amount = user.annual_income * (user.pension_contribution / 100)
         taxable_income = user.annual_income - pension_amount
-        
-        # Calculate income tax
-        if is_scotland:
-            tax = self._calculate_scottish_tax(taxable_income, thresholds)
+
+        # Employment type logic
+        if user.employment_type == "ltd_director":
+            # Use salary_taken if provided, otherwise up to personal allowance
+            salary = user.salary_taken if user.salary_taken is not None else min(user.annual_income, thresholds.personal_allowance)
+            remaining_profit = user.annual_income - salary
+
+            # Step 2: Corporation tax on remaining profit
+            corp_tax = remaining_profit * 0.25 if remaining_profit > 0 else 0
+            post_corp_profit = remaining_profit - corp_tax
+
+            # Step 3: Dividends from post-corp profit
+            dividends = post_corp_profit
+            dividend_taxable = max(0, dividends - 500)
+
+            # Calculate income tax on salary
+            if is_scotland:
+                salary_income_tax = self._calculate_scottish_tax(salary, thresholds)
+            else:
+                salary_income_tax = self._calculate_rUK_tax(salary, thresholds)
+
+            # Apply dividend tax bands (using rUK bands for simplicity)
+            total_income = salary + dividends
+            basic_band = thresholds.basic_rate_threshold - thresholds.personal_allowance
+            higher_band = thresholds.higher_rate_threshold - thresholds.basic_rate_threshold
+
+            dividend_tax = 0
+            if dividend_taxable > 0:
+                if dividend_taxable <= basic_band:
+                    dividend_tax += dividend_taxable * 0.0875
+                elif dividend_taxable <= basic_band + higher_band:
+                    dividend_tax += basic_band * 0.0875
+                    dividend_tax += (dividend_taxable - basic_band) * 0.3375
+                else:
+                    dividend_tax += basic_band * 0.0875
+                    dividend_tax += higher_band * 0.3375
+                    dividend_tax += (dividend_taxable - basic_band - higher_band) * 0.3935
+
+            # NI is only on salary above primary threshold
+            ni = self._calculate_ni(salary, thresholds)
+
+            # Student loan on total income if applicable
+            student_loan = self._calculate_student_loan(total_income) if user.has_student_loan else 0
+
+            net_income = salary + dividends - corp_tax - dividend_tax - ni - student_loan - pension_amount - salary_income_tax
+
+            return {
+                "gross_income": user.annual_income,
+                "salary": salary,
+                "dividends": dividends,
+                "corporation_tax": corp_tax,
+                "dividend_tax": dividend_tax,
+                "pension_contribution": pension_amount,
+                "taxable_income": taxable_income,
+                "income_tax": salary_income_tax,
+                "national_insurance": ni,
+                "student_loan": student_loan,
+                "net_income": net_income,
+                "is_scotland": is_scotland,
+                "employment_type": user.employment_type
+            }
+        elif user.employment_type == "self_employed":
+            # Self-employed: tax on profits, Class 2 and Class 4 NI
+            # For simplicity, assume all income is profit (no expenses deducted)
+            profit = taxable_income
+            # Income tax
+            if is_scotland:
+                tax = self._calculate_scottish_tax(profit, thresholds)
+            else:
+                tax = self._calculate_rUK_tax(profit, thresholds)
+            # Class 2 NI (flat rate, 2024/25: £3.45/week if profits > £12,570)
+            class2_ni = 3.45 * 52 if profit > 12570 else 0
+            # Class 4 NI (9% on profits between £12,570 and £50,270, 2% above £50,270)
+            class4_ni = 0
+            if profit > 12570:
+                upper_band = min(profit, 50270) - 12570
+                if upper_band > 0:
+                    class4_ni += upper_band * 0.09
+                if profit > 50270:
+                    class4_ni += (profit - 50270) * 0.02
+            # Student loan
+            student_loan = self._calculate_student_loan(profit) if user.has_student_loan else 0
+            # Net income
+            net_income = user.annual_income - tax - class2_ni - class4_ni - student_loan - pension_amount
+            return {
+                "gross_income": user.annual_income,
+                "pension_contribution": pension_amount,
+                "taxable_income": profit,
+                "income_tax": tax,
+                "class2_ni": class2_ni,
+                "class4_ni": class4_ni,
+                "national_insurance": class2_ni + class4_ni,
+                "student_loan": student_loan,
+                "net_income": net_income,
+                "is_scotland": is_scotland,
+                "employment_type": user.employment_type
+            }
         else:
-            tax = self._calculate_rUK_tax(taxable_income, thresholds)
-        
-        # Calculate National Insurance
-        ni = self._calculate_ni(taxable_income, thresholds)
-        
-        # Calculate student loan repayment if applicable
-        student_loan = self._calculate_student_loan(taxable_income) if user.has_student_loan else 0
-        
-        # Calculate net income
-        net_income = user.annual_income - tax - ni - student_loan - pension_amount
-        
-        return {
-            "gross_income": user.annual_income,
-            "pension_contribution": pension_amount,
-            "taxable_income": taxable_income,
-            "income_tax": tax,
-            "national_insurance": ni,
-            "student_loan": student_loan,
-            "net_income": net_income,
-            "is_scotland": is_scotland
-        }
+            # Calculate income tax
+            if is_scotland:
+                tax = self._calculate_scottish_tax(taxable_income, thresholds)
+            else:
+                tax = self._calculate_rUK_tax(taxable_income, thresholds)
+            
+            # Calculate National Insurance
+            ni = self._calculate_ni(taxable_income, thresholds)
+            
+            # Calculate student loan repayment if applicable
+            student_loan = self._calculate_student_loan(taxable_income) if user.has_student_loan else 0
+            
+            # Calculate net income
+            net_income = user.annual_income - tax - ni - student_loan - pension_amount
+            
+            return {
+                "gross_income": user.annual_income,
+                "pension_contribution": pension_amount,
+                "taxable_income": taxable_income,
+                "income_tax": tax,
+                "national_insurance": ni,
+                "student_loan": student_loan,
+                "net_income": net_income,
+                "is_scotland": is_scotland,
+                "employment_type": user.employment_type
+            }
     
     def _is_scottish_postcode(self, postcode: str) -> bool:
         """Check if postcode is in Scotland"""
@@ -433,6 +533,8 @@ def get_user_input() -> UserDetails:
         
         pension_contribution = float(console.input("[bold]Enter your current pension contribution percentage: [/bold]"))
         
+        employment_type = console.input("[bold]Enter your employment type (employed, self_employed, ltd_director): [/bold]").strip()
+        
         return UserDetails(
             annual_income=annual_income,
             spouse_income=spouse_income,
@@ -440,7 +542,8 @@ def get_user_input() -> UserDetails:
             num_children=num_children,
             postcode=postcode,
             has_student_loan=has_student_loan,
-            pension_contribution=pension_contribution
+            pension_contribution=pension_contribution,
+            employment_type=employment_type
         )
     except ValueError as e:
         console.print(f"[red]Invalid input: {str(e)}[/red]")

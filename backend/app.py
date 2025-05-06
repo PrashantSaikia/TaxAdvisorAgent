@@ -35,10 +35,12 @@ def calculate():
         data = request.get_json()
         
         # Safely convert and validate numeric inputs
+        employment_type = str(data.get('employment_type', 'employed'))
         annual_income = safe_float_convert(data.get('annual_income'))
         spouse_income = safe_float_convert(data.get('spouse_income'))
         pension_contribution = safe_float_convert(data.get('pension_contribution'))
         num_children = safe_int_convert(data.get('num_children'))
+        salary_taken = safe_float_convert(data.get('salary_taken')) if employment_type == 'ltd_director' and data.get('salary_taken') not in (None, '', 0, '0') else None
         
         # Initialize user details with validated data
         user = UserDetails(
@@ -49,7 +51,9 @@ def calculate():
             postcode=str(data.get('postcode', '')),
             has_student_loan=data.get('student_loan_plan') != 'none',
             student_loan_plan=str(data.get('student_loan_plan', 'none')),
-            pension_contribution=pension_contribution
+            pension_contribution=pension_contribution,
+            employment_type=employment_type,
+            **({'salary_taken': salary_taken} if salary_taken is not None else {})
         )
         
         # Initialize tax calculator

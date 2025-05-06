@@ -2,6 +2,10 @@
 
 A comprehensive web application for calculating UK tax liabilities and providing personalized optimization strategies. The application helps users understand their tax obligations, identifies potential savings opportunities, and checks eligibility for various benefits.
 
+Below is a screenshot of the application in action:
+
+![Demo Screenshot](image.jpg)
+
 ## Table of Contents
 - [Features](#features)
 - [Project Structure](#project-structure)
@@ -116,8 +120,7 @@ FLASK_APP=app.py
 
 1. Start the Flask development server:
 ```bash
-cd backend
-python app.py
+uv run python -m backend.app
 ```
 
 2. Access the application:
